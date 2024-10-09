@@ -8,6 +8,23 @@
 
 constexpr unsigned int FRAME_OVERLAP = 2; // Double (triple) buffer
 
+struct ComputePushConstants
+{
+	glm::vec4 data1;
+	glm::vec4 data2;
+	glm::vec4 data3;
+	glm::vec4 data4;
+};
+
+struct ComputeEffect {
+	const char* name;
+
+	VkPipeline pipeline;
+	VkPipelineLayout layout;
+
+	ComputePushConstants data;
+};
+
 struct DeletionQueue
 {
 	std::deque<std::function<void()>> deletors;
@@ -84,11 +101,21 @@ public:
 
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
+
+	VkFence _immFence;
+	VkCommandBuffer _immCommandBuffer;
+	VkCommandPool _immCommandPool;
+
+	std::vector<ComputeEffect> backgroundEffects;
+	int currentBackgroundEffect{ 0 };
+
 	void init();
-	void cleanup();
+	void run();
 	void draw_background(VkCommandBuffer cmd);
 	void draw();
-	void run();
+	void cleanup();
+	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
+	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
 
 private:
 	void initVulkan();
@@ -98,6 +125,8 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
+
+	void init_imgui();
 
 	void createSwapchain(uint32_t width, uint32_t height);
 	void destroySwapchain();

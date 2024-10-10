@@ -14,10 +14,16 @@ if not exist %OUTPUT_FOLDER% (
     mkdir %OUTPUT_FOLDER%
 )
 
-:: Compile all vertex shaders (.vert)
+:: Compile all vertex shaders (.comp)
 for %%f in (%SHADER_FOLDER%\*.comp) do (
     echo Compiling vertex shader %%~nxf...
     %GLSLANG_VALIDATOR% -V %%f -o %OUTPUT_FOLDER%\%%~nf.comp.spv
+)
+
+:: Compile all vertex shaders (.vert)
+for %%f in (%SHADER_FOLDER%\*.vert) do (
+    echo Compiling vertex shader %%~nxf...
+    %GLSLANG_VALIDATOR% -V %%f -o %OUTPUT_FOLDER%\%%~nf.vert.spv
 )
 
 :: Compile all fragment shaders (.frag)

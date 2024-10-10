@@ -5,6 +5,7 @@
 
 #include <vk_types.h>
 #include <vk_descriptors.h>
+#include <vk_loader.h>
 
 constexpr unsigned int FRAME_OVERLAP = 2; // Double (triple) buffer
 
@@ -92,6 +93,7 @@ public:
 	VmaAllocator _allocator;
 
 	AllocatedImage _drawImage;
+	AllocatedImage _depthImage;
 	VkExtent2D _drawExtent;
 
 	DescriptorAllocator globalDescriptorAllocator;
@@ -111,11 +113,17 @@ public:
 
 	void init();
 	void run();
-	void draw_background(VkCommandBuffer cmd);
+
 	void draw();
+	void draw_background(VkCommandBuffer cmd);
+	void draw_geometry(VkCommandBuffer cmd);
+
 	void cleanup();
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
+
+	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
 
 private:
 	void initVulkan();
@@ -126,7 +134,20 @@ private:
 	void init_pipelines();
 	void init_background_pipelines();
 
+	VkPipelineLayout _meshPipelineLayout;
+	VkPipeline _meshPipeline;
+
+	void init_mesh_pipeline();
+
+	void init_default_data();
+
+	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+
+	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+
 	void init_imgui();
+
+	void destroy_buffer(const AllocatedBuffer& buffer);
 
 	void createSwapchain(uint32_t width, uint32_t height);
 	void destroySwapchain();

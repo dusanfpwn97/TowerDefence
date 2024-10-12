@@ -36,7 +36,13 @@ void VulkanEngine::init()
     // We initialize SDL and create a window with it.
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
+    SDL_DisplayMode sdl_displayModeInfo;
+    SDL_GetCurrentDisplayMode(0, &sdl_displayModeInfo);
+
+    _windowExtent.width = sdl_displayModeInfo.w / 1.5;
+    _windowExtent.height = sdl_displayModeInfo.h / 1.5;
+
+    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
     _window = SDL_CreateWindow(
         "Vulkan Engine",
@@ -48,6 +54,7 @@ void VulkanEngine::init()
 
     // everything went fine
     _isInitialized = true;
+
 
     initVulkan();
     initSwapchain();
@@ -97,6 +104,10 @@ void VulkanEngine::run()
             continue;
         }
 
+        if (resize_requested)
+        {
+            resize_swapchain();
+        }
 
         // imgui new frame
         ImGui_ImplVulkan_NewFrame();
@@ -104,8 +115,11 @@ void VulkanEngine::run()
         ImGui::NewFrame();
 
 
-
         if (ImGui::Begin("background")) {
+
+            ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
+
+
 
             ComputeEffect& selected = backgroundEffects[currentBackgroundEffect];
 
@@ -132,6 +146,8 @@ void VulkanEngine::run()
 void VulkanEngine::draw()
 {
     // wait until the gpu has finished rendering the last frame. Timeout of 1 second
+    _drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
+    _drawExtent.width = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
 
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
     get_current_frame()._deletionQueue.flush();
@@ -139,7 +155,12 @@ void VulkanEngine::draw()
 
     //request image from the swapchain
     uint32_t swapchainImageIndex;
-    VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex));
+    VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex);
+    if (e == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        resize_requested = true;
+        return;
+    }
 
     //naming it cmd for shorter writing
     VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
@@ -219,8 +240,11 @@ void VulkanEngine::draw()
 
     presentInfo.pImageIndices = &swapchainImageIndex;
 
-    VK_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo));
-
+    VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
+    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        resize_requested = true;
+    }
     //increase the number of frames drawn
     _frameNumber++; 
 }
@@ -725,7 +749,10 @@ void VulkanEngine::init_mesh_pipeline()
     //no multisampling
     pipelineBuilder.set_multisampling_none();
     //no blending
-    pipelineBuilder.disable_blending();
+   // pipelineBuilder.disable_blending();
+    pipelineBuilder.enable_blending_additive();
+    //pipelineBuilder.enable_blending_alphablend();
+
 
     //pipelineBuilder.disable_depthtest();
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
@@ -928,6 +955,22 @@ void VulkanEngine::createSwapchain(uint32_t width, uint32_t height)
     _swapchain = vkbSwapchain.swapchain;
     _swapchainImages = vkbSwapchain.get_images().value();
     _swapchainImageViews = vkbSwapchain.get_image_views().value();
+}
+
+void VulkanEngine::resize_swapchain()
+{
+    vkDeviceWaitIdle(_device);
+
+    destroySwapchain();
+
+    int w, h;
+    SDL_GetWindowSize(_window, &w, &h);
+    _windowExtent.width = w;
+    _windowExtent.height = h;
+
+    createSwapchain(_windowExtent.width, _windowExtent.height);
+
+    resize_requested = false;
 }
 
 void VulkanEngine::destroySwapchain()

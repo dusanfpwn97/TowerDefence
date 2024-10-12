@@ -70,6 +70,10 @@ public:
 	bool stop_rendering{ false };
 	VkExtent2D _windowExtent{ 1700 , 900 };
 
+	float renderScale = 1.f;
+
+	bool resize_requested = false;
+
 	struct SDL_Window* _window{ nullptr };
 
 	static VulkanEngine& Get();
@@ -104,6 +108,11 @@ public:
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
 
+	VkPipelineLayout _meshPipelineLayout;
+	VkPipeline _meshPipeline;
+
+
+
 	VkFence _immFence;
 	VkCommandBuffer _immCommandBuffer;
 	VkCommandPool _immCommandPool;
@@ -133,11 +142,9 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
-
-	VkPipelineLayout _meshPipelineLayout;
-	VkPipeline _meshPipeline;
-
 	void init_mesh_pipeline();
+
+
 
 	void init_default_data();
 
@@ -150,5 +157,6 @@ private:
 	void destroy_buffer(const AllocatedBuffer& buffer);
 
 	void createSwapchain(uint32_t width, uint32_t height);
+	void resize_swapchain();
 	void destroySwapchain();
 };

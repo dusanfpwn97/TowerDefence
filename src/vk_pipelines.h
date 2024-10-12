@@ -35,5 +35,9 @@ public:
     void enable_depthtest(bool depthWriteEnable, VkCompareOp op);
     void clear();
 
+    void enable_blending_additive();
+
+    void enable_blending_alphablend();
+
 
 };

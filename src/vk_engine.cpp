@@ -432,7 +432,10 @@ void VulkanEngine::initVulkan()
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &_allocator);
 
-    _mainDeletionQueue.push_function([&]() { vmaDestroyAllocator(_allocator); });
+    _mainDeletionQueue.push_function([&]()
+        {
+            vmaDestroyAllocator(_allocator); 
+        });
 
 }
 
@@ -469,19 +472,6 @@ void VulkanEngine::initSwapchain()
 
     VK_CHECK(vkCreateImageView(_device, &rview_info, nullptr, &_drawImage.imageView));
 
-    //add to deletion queues
-    _mainDeletionQueue.push_function([=]()
-        {
-            vkDestroyImageView(_device, _drawImage.imageView, nullptr);
-            vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
-
-            vkDestroyImageView(_device, _depthImage.imageView, nullptr);
-            vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
-        }
-    );
-
-
-
     // Depth image
     _depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
     _depthImage.imageExtent = drawImageExtent;
@@ -498,12 +488,13 @@ void VulkanEngine::initSwapchain()
 
     VK_CHECK(vkCreateImageView(_device, &dview_info, nullptr, &_depthImage.imageView));
 
-    _mainDeletionQueue.push_function([=]() {
-        vkDestroyImageView(_device, _drawImage.imageView, nullptr);
-        vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
+    _mainDeletionQueue.push_function([=]()
+        {
+            vkDestroyImageView(_device, _drawImage.imageView, nullptr);
+            vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
 
-        vkDestroyImageView(_device, _depthImage.imageView, nullptr);
-        vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
+            vkDestroyImageView(_device, _depthImage.imageView, nullptr);
+            vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
         });
 }
 
@@ -598,10 +589,10 @@ void VulkanEngine::init_descriptors()
     vkUpdateDescriptorSets(_device, 1, &drawImageWrite, 0, nullptr);
 
     //make sure both the descriptor allocator and the new layout get cleaned up properly
-    _mainDeletionQueue.push_function([&]() {
-        globalDescriptorAllocator.destroy_pool(_device);
-
-        vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
+    _mainDeletionQueue.push_function([&]()
+        {
+            globalDescriptorAllocator.destroy_pool(_device);
+            vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
         });
 }
 

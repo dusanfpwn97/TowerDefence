@@ -145,22 +145,26 @@ void VulkanEngine::run()
 
 void VulkanEngine::draw()
 {
-    // wait until the gpu has finished rendering the last frame. Timeout of 1 second
-    _drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
-    _drawExtent.width = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
 
+    // wait until the gpu has finished rendering the last frame. Timeout of 1 second
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
+
     get_current_frame()._deletionQueue.flush();
-    VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
     //request image from the swapchain
     uint32_t swapchainImageIndex;
+
     VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex);
     if (e == VK_ERROR_OUT_OF_DATE_KHR)
     {
         resize_requested = true;
         return;
     }
+
+    _drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
+    _drawExtent.width = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
+
+    VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
     //naming it cmd for shorter writing
     VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
@@ -171,9 +175,6 @@ void VulkanEngine::draw()
 
     //begin the command buffer recording. We will use this command buffer exactly once, so we want to let vulkan know that
     VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    _drawExtent.width = _drawImage.imageExtent.width;
-    _drawExtent.height = _drawImage.imageExtent.height;
 
     //start the command buffer recording
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
@@ -270,7 +271,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
     VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    VkRenderingInfo renderInfo = vkinit::rendering_info(_windowExtent, &colorAttachment, &depthAttachment);
+    VkRenderingInfo renderInfo = vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);

@@ -33,3 +33,5 @@ for %%f in (%SHADER_FOLDER%\*.frag) do (
 )
 
 echo All shaders compiled!
+
+pause

@@ -9,6 +9,7 @@
 
 constexpr unsigned int FRAME_OVERLAP = 2; // Double (triple) buffer
 
+
 struct ComputePushConstants
 {
 	glm::vec4 data1;
@@ -17,7 +18,8 @@ struct ComputePushConstants
 	glm::vec4 data4;
 };
 
-struct ComputeEffect {
+struct ComputeEffect
+{
 	const char* name;
 
 	VkPipeline pipeline;
@@ -66,7 +68,55 @@ struct GPUSceneData
 	glm::vec4 sunlightColor;
 };
 
+struct GLTFMetallic_Roughness
+{
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
 
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants
+	{
+		glm::vec4 colorFactors;
+		glm::vec4 metal_rough_factors;
+		//padding, we need it anyway for uniform buffers
+		glm::vec4 extra[14];
+	};
+
+	struct MaterialResources
+	{
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
+
+	DescriptorWriter writer;
+
+	void build_pipelines(VulkanEngine* engine);
+	void clear_resources(VkDevice device);
+
+	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
+
+struct RenderObject
+{
+	uint32_t indexCount;
+	uint32_t firstIndex;
+	VkBuffer indexBuffer;
+
+	MaterialInstance* material;
+
+	glm::mat4 transform;
+	VkDeviceAddress vertexBufferAddress;
+};
+
+struct DrawContext
+{
+	std::vector<RenderObject> OpaqueSurfaces;
+};
 
 class VulkanEngine
 {
@@ -112,8 +162,8 @@ public:
 	AllocatedImage _depthImage;
 	VkExtent2D _drawExtent;
 
-	DescriptorAllocator globalDescriptorAllocator;
-
+	DescriptorAllocatorGrowable globalDescriptorAllocator;
+	
 	VkDescriptorSet _drawImageDescriptors;
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
 	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
@@ -160,6 +210,14 @@ public:
 	VkSampler _defaultSamplerLinear;
 	VkSampler _defaultSamplerNearest;
 
+
+	MaterialInstance defaultData;
+	GLTFMetallic_Roughness metalRoughMaterial;
+
+	DrawContext mainDrawContext;
+	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+
+	void update_scene();
 
 private:
 	void initVulkan();

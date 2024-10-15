@@ -64,8 +64,9 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
                 indices.reserve(indices.size() + indexaccessor.count);
 
                 fastgltf::iterateAccessor<std::uint32_t>(gltf, indexaccessor,
-                    [&](std::uint32_t idx) {
-                        indices.push_back(idx + initial_vtx);
+                    [&](std::uint32_t idx)
+                    {
+                        indices.push_back(idx + (uint32_t)initial_vtx);
                     });
             }
 
@@ -120,7 +121,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
         }
 
         // display the vertex normals
-        constexpr bool OverrideColors = true;
+        constexpr bool OverrideColors = false;
         if (OverrideColors)
         {
             for (Vertex& vtx : vertices) 

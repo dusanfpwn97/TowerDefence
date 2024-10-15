@@ -44,14 +44,26 @@ struct DeletionQueue
 	}
 };
 
-struct FrameData {
-
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
+struct FrameData
+{
 	VkSemaphore _swapchainSemaphore, _renderSemaphore;
 	VkFence _renderFence;
 
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
 	DeletionQueue _deletionQueue;
+	DescriptorAllocatorGrowable _frameDescriptors;
+};
+
+struct GPUSceneData
+{
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::mat4 viewproj;
+	glm::vec4 ambientColor;
+	glm::vec4 sunlightDirection; // w for sun power
+	glm::vec4 sunlightColor;
 };
 
 
@@ -104,6 +116,8 @@ public:
 
 	VkDescriptorSet _drawImageDescriptors;
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
+	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+	VkDescriptorSetLayout _singleImageDescriptorLayout;
 
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
@@ -111,7 +125,7 @@ public:
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
 
-
+	GPUSceneData sceneData;
 
 	VkFence _immFence;
 	VkCommandBuffer _immCommandBuffer;
@@ -134,6 +148,19 @@ public:
 	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 
+	AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+	AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+	void destroy_image(const AllocatedImage& img);
+
+	AllocatedImage _whiteImage;
+	AllocatedImage _blackImage;
+	AllocatedImage _greyImage;
+	AllocatedImage _errorCheckerboardImage;
+
+	VkSampler _defaultSamplerLinear;
+	VkSampler _defaultSamplerNearest;
+
+
 private:
 	void initVulkan();
 	void initSwapchain();
@@ -143,8 +170,6 @@ private:
 	void init_pipelines();
 	void init_background_pipelines();
 	void init_mesh_pipeline();
-
-
 
 	void init_default_data();
 

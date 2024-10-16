@@ -6,6 +6,8 @@
 #include <vk_types.h>
 #include <vk_descriptors.h>
 #include <vk_loader.h>
+#include <camera.h>
+
 
 constexpr unsigned int FRAME_OVERLAP = 2; // Double (triple) buffer
 
@@ -218,6 +220,8 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
 
 	void update_scene();
+
+	Camera mainCamera;
 
 private:
 	void initVulkan();

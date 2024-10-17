@@ -101,7 +101,7 @@ class IRenderable {
 // to them
 struct Node : public IRenderable
 {
-
+public:
     // parent pointer must be a weak pointer to avoid circular dependencies
     std::weak_ptr<Node> parent;
     std::vector<std::shared_ptr<Node>> children;
@@ -133,4 +133,14 @@ struct MeshNode : public Node
     std::shared_ptr<struct MeshAsset> mesh;
 
     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
+
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for sun power
+    glm::vec4 sunlightColor;
 };

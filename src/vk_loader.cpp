@@ -182,7 +182,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 } };
 
-    file.descriptorPool.init(engine->_device, gltf.materials.size(), sizes);
+    file.descriptorPool.init(engine->_device, (uint32_t)gltf.materials.size(), sizes);
     //< load_2
     //> load_samplers
 
@@ -312,7 +312,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
                 fastgltf::iterateAccessor<std::uint32_t>(gltf, indexaccessor,
                     [&](std::uint32_t idx) {
-                        indices.push_back(idx + initial_vtx);
+                        indices.push_back(idx + (uint32_t)initial_vtx);
                     });
             }
 

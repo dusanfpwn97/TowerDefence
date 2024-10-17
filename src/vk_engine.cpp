@@ -269,7 +269,7 @@ void VulkanEngine::draw_main(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
-    vkCmdDispatch(cmd, std::ceil(_windowExtent.width / 16.0), std::ceil(_windowExtent.height / 16.0), 1);
+    vkCmdDispatch(cmd, (uint32_t)std::ceil((float)_windowExtent.width / 16.0), (uint32_t)std::ceil((float)_windowExtent.height / 16.0), 1);
 
     //draw the triangle
 
@@ -318,8 +318,8 @@ void VulkanEngine::draw()
         return;
     }
 
-    _drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
-    _drawExtent.width = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
+    _drawExtent.height = uint32_t((float)std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale);
+    _drawExtent.width  = uint32_t((float)std::min(_swapchainExtent.width , _drawImage.imageExtent.width)  * renderScale);
 
     VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
@@ -615,7 +615,7 @@ void VulkanEngine::run()
 
             ImGui::Text("Selected effect: ", selected.name);
 
-            ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, backgroundEffects.size() - 1);
+            ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, (int)backgroundEffects.size() - 1);
 
             ImGui::InputFloat4("data1", (float*)&selected.data.data1);
             ImGui::InputFloat4("data2", (float*)&selected.data.data2);
@@ -732,32 +732,34 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
 
     AllocatedImage new_image = create_image(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
 
-    immediate_submit([&](VkCommandBuffer cmd) {
-        vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    prepare_immidate_command_buffer_submit();
 
-        VkBufferImageCopy copyRegion = {};
-        copyRegion.bufferOffset = 0;
-        copyRegion.bufferRowLength = 0;
-        copyRegion.bufferImageHeight = 0;
+    vkutil::transition_image(_immidiateCommandBuffer, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copyRegion.imageSubresource.mipLevel = 0;
-        copyRegion.imageSubresource.baseArrayLayer = 0;
-        copyRegion.imageSubresource.layerCount = 1;
-        copyRegion.imageExtent = size;
+    VkBufferImageCopy copyRegion = {};
+    copyRegion.bufferOffset = 0;
+    copyRegion.bufferRowLength = 0;
+    copyRegion.bufferImageHeight = 0;
 
-        // copy the buffer into the image
-        vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-            &copyRegion);
+    copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copyRegion.imageSubresource.mipLevel = 0;
+    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.layerCount = 1;
+    copyRegion.imageExtent = size;
 
-        if (mipmapped) {
-            vkutil::generate_mipmaps(cmd, new_image.image, VkExtent2D{ new_image.imageExtent.width, new_image.imageExtent.height });
-        }
-        else {
-            vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        }
-        });
+    // copy the buffer into the image
+    vkCmdCopyBufferToImage(_immidiateCommandBuffer, uploadbuffer.buffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+    if (mipmapped)
+    {
+        vkutil::generate_mipmaps(_immidiateCommandBuffer, new_image.image, VkExtent2D{ new_image.imageExtent.width, new_image.imageExtent.height });
+    }
+    else
+    {
+        vkutil::transition_image(_immidiateCommandBuffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
+    submit_immidiate_cmd_buffer();
     destroy_buffer(uploadbuffer);
     return new_image;
 }
@@ -788,21 +790,23 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
     // copy index buffer
     memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
 
-    immediate_submit([&](VkCommandBuffer cmd) {
-        VkBufferCopy vertexCopy{ 0 };
-        vertexCopy.dstOffset = 0;
-        vertexCopy.srcOffset = 0;
-        vertexCopy.size = vertexBufferSize;
+    prepare_immidate_command_buffer_submit();
 
-        vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
+    VkBufferCopy vertexCopy{ 0 };
+    vertexCopy.dstOffset = 0;
+    vertexCopy.srcOffset = 0;
+    vertexCopy.size = vertexBufferSize;
 
-        VkBufferCopy indexCopy{ 0 };
-        indexCopy.dstOffset = 0;
-        indexCopy.srcOffset = vertexBufferSize;
-        indexCopy.size = indexBufferSize;
+    vkCmdCopyBuffer(_immidiateCommandBuffer, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
 
-        vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
-        });
+    VkBufferCopy indexCopy{ 0 };
+    indexCopy.dstOffset = 0;
+    indexCopy.srcOffset = vertexBufferSize;
+    indexCopy.size = indexBufferSize;
+
+    vkCmdCopyBuffer(_immidiateCommandBuffer, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+
+    submit_immidiate_cmd_buffer();
 
     destroy_buffer(staging);
 
@@ -819,30 +823,32 @@ FrameData& VulkanEngine::get_last_frame()
     return _frames[(_frameNumber - 1) % FRAME_OVERLAP];
 }
 
-void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function)
+void VulkanEngine::prepare_immidate_command_buffer_submit()
 {
-    VK_CHECK(vkResetFences(_device, 1, &_immFence));
-    VK_CHECK(vkResetCommandBuffer(_immCommandBuffer, 0));
+    VK_CHECK(vkResetFences(_device, 1, &_immidiateFence));
+    VK_CHECK(vkResetCommandBuffer(_immidiateCommandBuffer, 0));
 
-    VkCommandBuffer cmd = _immCommandBuffer;
-    // begin the command buffer recording. We will use this command buffer exactly
-    // once, so we want to let vulkan know that
+    // begin the command buffer recording. We will use this command buffer exactly once, so we want to let vulkan know that
     VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+    VK_CHECK(vkBeginCommandBuffer(_immidiateCommandBuffer, &cmdBeginInfo));
+}
 
-    function(cmd);
+void VulkanEngine::submit_immidiate_cmd_buffer()
+{
+    VK_CHECK(vkEndCommandBuffer(_immidiateCommandBuffer));
 
-    VK_CHECK(vkEndCommandBuffer(cmd));
-
-    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
+    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(_immidiateCommandBuffer);
     VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, nullptr, nullptr);
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, _immFence));
+    VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, _immidiateFence));
 
-    VK_CHECK(vkWaitForFences(_device, 1, &_immFence, true, 9999999999));
+    VK_CHECK(vkWaitForFences(_device, 1, &_immidiateFence, true, 9999999999));
+
+    vkResetCommandBuffer(_immidiateCommandBuffer, 0);
+
 }
 
 void VulkanEngine::destroy_image(const AllocatedImage& img)
@@ -1054,14 +1060,14 @@ void VulkanEngine::init_commands()
         _mainDeletionQueue.push_function([=]() { vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr); });
     }
 
-    VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_immCommandPool));
+    VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_immidiateCommandPool));
 
     // allocate the default command buffer that we will use for rendering
-    VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_immCommandPool, 1);
+    VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_immidiateCommandPool, 1);
 
-    VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immCommandBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immidiateCommandBuffer));
 
-    _mainDeletionQueue.push_function([=]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); });
+    _mainDeletionQueue.push_function([=]() { vkDestroyCommandPool(_device, _immidiateCommandPool, nullptr); });
 }
 
 void VulkanEngine::init_sync_structures()
@@ -1072,9 +1078,9 @@ void VulkanEngine::init_sync_structures()
     // we want the fence to start signalled so we can wait on it on the first
     // frame
     VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
-    VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_immFence));
+    VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_immidiateFence));
 
-    _mainDeletionQueue.push_function([=]() { vkDestroyFence(_device, _immFence, nullptr); });
+    _mainDeletionQueue.push_function([=]() { vkDestroyFence(_device, _immidiateFence, nullptr); });
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
 

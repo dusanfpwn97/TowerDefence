@@ -178,9 +178,11 @@ public:
     AllocatedImage _depthImage;
 
     // immediate submit structures
-    VkFence _immFence;
-    VkCommandBuffer _immCommandBuffer;
-    VkCommandPool _immCommandPool;
+    VkFence _immidiateFence;
+    VkCommandBuffer _immidiateCommandBuffer;
+    VkCommandPool _immidiateCommandPool;
+    void prepare_immidate_command_buffer_submit();
+    void submit_immidiate_cmd_buffer();
 
     AllocatedImage _whiteImage;
     AllocatedImage _blackImage;
@@ -237,10 +239,7 @@ public:
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
 
-    void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
-
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
-    std::vector<std::shared_ptr<LoadedGLTF>> brickadiaScene;
 
     void destroy_image(const AllocatedImage& img);
     void destroy_buffer(const AllocatedBuffer& buffer);

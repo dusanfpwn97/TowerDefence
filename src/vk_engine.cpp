@@ -121,7 +121,7 @@ void VulkanEngine::init_default_data() {
 
     uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
     _blackImage = create_image((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-
+    
     //checkerboard image
     uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
     std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
@@ -243,7 +243,8 @@ void VulkanEngine::deleteVulkanObjects()
 
     vkDestroyDescriptorSetLayout(_device, metalRoughMaterial.materialLayout, nullptr);
     vkDestroyPipelineLayout(_device, metalRoughMaterial.opaquePipeline.layout, nullptr);
-    vkDestroyPipelineLayout(_device, metalRoughMaterial.transparentPipeline.layout, nullptr);
+    // transparentPipeline layout is the same as opaquePipeline, so no don't destroy it
+    //vkDestroyPipelineLayout(_device, metalRoughMaterial.transparentPipeline.layout, nullptr);
     vkDestroyPipeline(_device, metalRoughMaterial.opaquePipeline.pipeline, nullptr);
     vkDestroyPipeline(_device, metalRoughMaterial.transparentPipeline.pipeline, nullptr);
 
@@ -560,7 +561,8 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     MaterialInstance* lastMaterial = nullptr;
     VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
 
-    auto draw = [&](const RenderObject& r) {
+    auto draw = [&](const RenderObject& r)
+    {
         if (r.material != lastMaterial) {
             lastMaterial = r.material;
             if (r.material->pipeline != lastPipeline) {
@@ -606,7 +608,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
         stats.drawcall_count++;
         stats.triangle_count += r.indexCount / 3;
         vkCmdDrawIndexed(cmd, r.indexCount, 1, r.firstIndex, 0, 0);
-        };
+    };
 
     stats.drawcall_count = 0;
     stats.triangle_count = 0;

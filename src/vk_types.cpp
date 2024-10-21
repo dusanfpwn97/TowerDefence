@@ -16,10 +16,12 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
         def.transform = nodeMatrix;
         def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
 
-        if (s.material->data.passType == MaterialPass::Transparent) {
+        if (s.material->data.passType == MaterialPass::Transparent)
+        {
             ctx.TransparentSurfaces.push_back(def);
         }
-        else {
+        else
+        {
             ctx.OpaqueSurfaces.push_back(def);
         }
     }

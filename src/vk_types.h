@@ -21,7 +21,8 @@
 #include <glm/vec4.hpp>
 
 
-struct AllocatedImage {
+struct AllocatedImage
+{
     VkImage image;
     VkImageView imageView;
     VmaAllocation allocation;
@@ -58,7 +59,6 @@ struct Vertex
 // holds the resources needed for a mesh
 struct GPUMeshBuffers
 {
-
     AllocatedBuffer indexBuffer;
     AllocatedBuffer vertexBuffer;
     VkDeviceAddress vertexBufferAddress;

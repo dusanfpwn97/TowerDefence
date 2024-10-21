@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <filesystem>
 
-class VulkanEngine;
+class VulkanRenderer;
 
 struct Bounds {
     glm::vec3 origin;
@@ -53,7 +53,7 @@ struct LoadedGLTF : public IRenderable {
 
     AllocatedBuffer materialDataBuffer;
 
-    VulkanEngine* creator;
+    VulkanRenderer* creator;
 
     ~LoadedGLTF() { clearAll(); };
 
@@ -64,4 +64,4 @@ private:
     void clearAll();
 };
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::string_view filePath);
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* engine, std::string_view filePath);

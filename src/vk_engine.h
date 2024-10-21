@@ -23,25 +23,6 @@ namespace fastgltf {
     struct Mesh;
 }
 
-struct DeletionQueue {
-    std::deque<std::function<void()>> deletors;
-
-    void push_function(std::function<void()>&& function)
-    {
-        deletors.push_back(function);
-    }
-
-    void flush()
-    {
-        // reverse iterate the deletion queue to execute all the functions
-        for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
-            (*it)(); // call functors
-        }
-
-        deletors.clear();
-    }
-};
-
 struct ComputePushConstants {
     glm::vec4 data1;
     glm::vec4 data2;
@@ -74,10 +55,11 @@ struct FrameData {
     VkFence _renderFence;
 
     DescriptorAllocatorGrowable _frameDescriptors;
-    DeletionQueue _deletionQueue;
 
     VkCommandPool _commandPool;
     VkCommandBuffer _mainCommandBuffer;
+
+    AllocatedBuffer gpuSceneDataBuffer;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -165,11 +147,10 @@ public:
     VkDescriptorSet _drawImageDescriptors;
     VkDescriptorSetLayout _drawImageDescriptorLayout;
 
-    DeletionQueue _mainDeletionQueue;
-
     VmaAllocator _allocator; // vma lib allocator
 
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+
 
     GLTFMetallic_Roughness metalRoughMaterial;
 
@@ -182,7 +163,12 @@ public:
     VkCommandBuffer _immidiateCommandBuffer;
     VkCommandPool _immidiateCommandPool;
     void prepare_immidate_command_buffer_submit();
-    void submit_immidiate_cmd_buffer();
+    void submit_immidiate_command_buffer();
+
+    void deleteVulkanObjects();
+
+    ComputeEffect sky;
+    ComputeEffect gradient;
 
     AllocatedImage _whiteImage;
     AllocatedImage _blackImage;
@@ -248,6 +234,11 @@ public:
 
     bool resize_requested{ false };
     bool freeze_rendering{ false };
+
+
+
+    //Imgui
+    VkDescriptorPool imguiPool;
 private:
     void init_vulkan();
 

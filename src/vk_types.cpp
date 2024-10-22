@@ -10,7 +10,7 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
         RenderObject def;
         def.indexCount = s.count;
         def.firstIndex = s.startIndex;
-        def.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
+        def.indexBuffer = mesh->meshBuffers.indexBuffer->buffer;
         def.material = &s.material->data;
         def.bounds = s.bounds;
         def.transform = nodeMatrix;

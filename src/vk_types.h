@@ -23,6 +23,12 @@
 
 struct AllocatedImage
 {
+    AllocatedImage()
+    {
+        image = VK_NULL_HANDLE;
+        imageView = VK_NULL_HANDLE;
+        allocation = VK_NULL_HANDLE;
+    }
     VkImage image;
     VkImageView imageView;
     VmaAllocation allocation;
@@ -59,8 +65,8 @@ struct Vertex
 // holds the resources needed for a mesh
 struct GPUMeshBuffers
 {
-    AllocatedBuffer indexBuffer;
-    AllocatedBuffer vertexBuffer;
+    AllocatedBuffer* indexBuffer;
+    AllocatedBuffer* vertexBuffer;
     VkDeviceAddress vertexBufferAddress;
 };
 

@@ -15,11 +15,11 @@
 
 
 //> loadimg
-std::optional<AllocatedImage> load_image(VulkanRenderer* engine, fastgltf::Asset& asset, fastgltf::Image& image)
+AllocatedImage* load_image(VulkanRenderer* engine, fastgltf::Asset& asset, fastgltf::Image& image)
 {
-    AllocatedImage newImage{};
-
     int width, height, nrChannels;
+
+    AllocatedImage* new_image = nullptr;
 
     std::visit(fastgltf::visitor
     {
@@ -39,7 +39,7 @@ std::optional<AllocatedImage> load_image(VulkanRenderer* engine, fastgltf::Asset
                 imagesize.height = height;
                 imagesize.depth = 1;
             
-                newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                new_image = engine->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
             
                 stbi_image_free(data);
             }
@@ -54,7 +54,7 @@ std::optional<AllocatedImage> load_image(VulkanRenderer* engine, fastgltf::Asset
                 imagesize.height = height;
                 imagesize.depth = 1;
         
-                newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                new_image = engine->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
         
                 stbi_image_free(data);
             }
@@ -64,11 +64,13 @@ std::optional<AllocatedImage> load_image(VulkanRenderer* engine, fastgltf::Asset
             auto& bufferView = asset.bufferViews[view.bufferViewIndex];
             auto& buffer = asset.buffers[bufferView.bufferIndex];
         
-            std::visit(fastgltf::visitor { // We only care about VectorWithMime here, because we
+            std::visit(fastgltf::visitor {
+                // We only care about VectorWithMime here, because we
                 // specify LoadExternalBuffers, meaning all buffers
                 // are already loaded into a vector.
         [](auto& arg) {},
-        [&](fastgltf::sources::Vector& vector) {
+        [&](fastgltf::sources::Vector& vector)
+        {
             unsigned char* data = stbi_load_from_memory(vector.bytes.data() + bufferView.byteOffset,
                 static_cast<int>(bufferView.byteLength),
                 &width, &height, &nrChannels, 4);
@@ -78,7 +80,7 @@ std::optional<AllocatedImage> load_image(VulkanRenderer* engine, fastgltf::Asset
                 imagesize.height = height;
                 imagesize.depth = 1;
         
-                newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                new_image = engine->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_USAGE_SAMPLED_BIT, true);
         
                 stbi_image_free(data);
             }
@@ -89,12 +91,13 @@ std::optional<AllocatedImage> load_image(VulkanRenderer* engine, fastgltf::Asset
     
      // if any of the attempts to load the data failed, we havent written the image
      // so handle is null
-     if (newImage.image == VK_NULL_HANDLE)
+     if (new_image && new_image->image == VK_NULL_HANDLE)
      {
-         return {};
+         return nullptr;
      }
-     else {
-         return newImage;
+     else
+     {
+         return new_image;
      }
 }
 
@@ -130,7 +133,6 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
     }
 }
-//< filters
 
 std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, std::string_view filePath)
 {
@@ -138,7 +140,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
 
     std::shared_ptr<LoadedGLTF> scene = std::make_shared<LoadedGLTF>();
     scene->creator = renderer;
-    LoadedGLTF& file = *scene.get();
+    LoadedGLTF& loaded_gltf = *scene.get();
 
     fastgltf::Parser parser{};
 
@@ -177,19 +179,18 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
         std::cerr << "Failed to determine glTF container" << std::endl;
         return {};
     }
-    //< load_1
-    //> load_2
-        // we can stimate the descriptors we will need accurately
-    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 } };
 
-    file.descriptorPool.init(renderer->vk_device, (uint32_t)gltf.materials.size(), sizes);
-    //< load_2
-    //> load_samplers
+    // we can estimate the descriptors we will need accurately
+    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         3 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1 } };
 
-        // load samplers
-    for (fastgltf::Sampler& sampler : gltf.samplers) {
+    loaded_gltf.descriptorPool.init(renderer->vk_device, (uint32_t)gltf.materials.size(), sizes);
+
+    // load_samplers
+    for (fastgltf::Sampler& sampler : gltf.samplers)
+    {
 
         VkSamplerCreateInfo sampl = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr };
         sampl.maxLod = VK_LOD_CLAMP_NONE;
@@ -203,48 +204,54 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
         VkSampler newSampler;
         vkCreateSampler(renderer->vk_device, &sampl, nullptr, &newSampler);
 
-        file.samplers.push_back(newSampler);
+        loaded_gltf.samplers.push_back(newSampler);
     }
-    //< load_samplers
-    //> load_arrays
-        // temporal arrays for all the objects to use while creating the GLTF data
+
+    // temporal arrays for all the objects to use while creating the GLTF data
     std::vector<std::shared_ptr<MeshAsset>> meshes;
     std::vector<std::shared_ptr<Node>> nodes;
-    std::vector<AllocatedImage> images;
+    //std::vector<AllocatedImage> images;
     std::vector<std::shared_ptr<GLTFMaterial>> materials;
-    //< load_arrays
 
-        // load all textures
+
+
+    // load all images
     for (fastgltf::Image& image : gltf.images)
     {
-        std::optional<AllocatedImage> img = load_image(renderer, gltf, image);
+        //renderer->allocated_images.emplace_back(new AllocatedImage);
+        AllocatedImage* imgRef = nullptr;// = renderer->allocated_images.back();
+        //bool has_loaded_image
+        imgRef = load_image(renderer, gltf, image);
 
-        if (img.has_value()) {
-            images.push_back(*img);
-            file.images[image.name.c_str()] = *img;
-        }
-        else {
-            // we failed to load, so lets give the slot a default white texture to not
-            // completely break loading
-            images.push_back(renderer->error_checkerboard_image);
+        loaded_gltf.images.push_back(imgRef);
+        loaded_gltf.image_names.emplace_back(image.name.c_str());
+
+
+        renderer->allocated_images;
+        //img
+        if (!imgRef)
+        {
+            // we failed to load, so give the slot a default white texture to not completely break loading
+            loaded_gltf.images.back() = (&renderer->error_checkerboard_image);
+            loaded_gltf.image_names.back() = ("error_checkerboard_image");
+           // images.back() = renderer->error_checkerboard_image;
             std::cout << "gltf failed to load texture " << image.name << std::endl;
         }
+
+
     }
 
-    //> load_buffer
-        // create buffer to hold the material data
-    file.materialDataBuffer = renderer->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    // create buffer to hold the material data
+    loaded_gltf.materialDataBuffer = renderer->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     int data_index = 0;
-    GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
-    //< load_buffer
-        //
-    //> load_material
+    GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)loaded_gltf.materialDataBuffer->info.pMappedData;
+
+    // load_material
     for (fastgltf::Material& mat : gltf.materials)
     {
         std::shared_ptr<GLTFMaterial> newMat = std::make_shared<GLTFMaterial>();
         materials.push_back(newMat);
-        file.materials[mat.name.c_str()] = newMat;
+        loaded_gltf.materials[mat.name.c_str()] = newMat;
 
         GLTFMetallic_Roughness::MaterialConstants constants;
         constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
@@ -258,7 +265,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
         sceneMaterialConstants[data_index] = constants;
 
         MaterialPass passType = MaterialPass::MainColor;
-        if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
+        if (mat.alphaMode == fastgltf::AlphaMode::Blend)
+        {
             passType = MaterialPass::Transparent;
         }
 
@@ -270,25 +278,26 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
         materialResources.metalRoughSampler = renderer->default_sampler_linear;
 
         // set the uniform buffer for the material data
-        materialResources.dataBuffer = file.materialDataBuffer.buffer;
+        materialResources.dataBuffer = loaded_gltf.materialDataBuffer->buffer;
         materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
+
         // grab textures from gltf file
-        if (mat.pbrData.baseColorTexture.has_value()) {
+        if (mat.pbrData.baseColorTexture.has_value())
+        {
             size_t img = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
             size_t sampler = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
 
-            materialResources.colorImage = images[img];
-            materialResources.colorSampler = file.samplers[sampler];
+            materialResources.colorImage = *loaded_gltf.images[img];
+            materialResources.colorSampler = loaded_gltf.samplers[sampler];
         }
         // build material
-        newMat->data = renderer->rough_metal_material.write_material(renderer->vk_device, passType, materialResources, file.descriptorPool);
+        newMat->data = renderer->rough_metal_material.write_material(renderer->vk_device, passType, materialResources, loaded_gltf.descriptorPool);
 
         data_index++;
     }
-    //< load_material
 
-        // use the same vectors for all meshes so that the memory doesnt reallocate as
-        // often
+
+    // Load meshes
     std::vector<uint32_t> indices;
     std::vector<Vertex> vertices;
 
@@ -296,14 +305,15 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
     {
         std::shared_ptr<MeshAsset> newmesh = std::make_shared<MeshAsset>();
         meshes.push_back(newmesh);
-        file.meshes[mesh.name.c_str()] = newmesh;
+        loaded_gltf.meshes[mesh.name.c_str()] = newmesh;
         newmesh->name = mesh.name;
 
         // clear the mesh arrays each mesh, we dont want to merge them by error
         indices.clear();
         vertices.clear();
 
-        for (auto&& p : mesh.primitives) {
+        for (auto&& p : mesh.primitives)
+        {
             GeoSurface newSurface;
             newSurface.startIndex = (uint32_t)indices.size();
             newSurface.count = (uint32_t)gltf.accessors[p.indicesAccessor.value()].count;
@@ -340,7 +350,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
 
             // load vertex normals
             auto normals = p.findAttribute("NORMAL");
-            if (normals != p.attributes.end()) {
+            if (normals != p.attributes.end())
+            {
 
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, gltf.accessors[(*normals).second],
                     [&](glm::vec3 v, size_t index) {
@@ -350,7 +361,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
 
             // load UVs
             auto uv = p.findAttribute("TEXCOORD_0");
-            if (uv != p.attributes.end()) {
+            if (uv != p.attributes.end())
+            {
 
                 fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
                     [&](glm::vec2 v, size_t index) {
@@ -361,7 +373,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
 
             // load vertex colors
             auto colors = p.findAttribute("COLOR_0");
-            if (colors != p.attributes.end()) {
+            if (colors != p.attributes.end())
+            {
 
                 fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second],
                     [&](glm::vec4 v, size_t index) {
@@ -369,7 +382,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
                     });
             }
 
-            if (p.materialIndex.has_value()) {
+            if (p.materialIndex.has_value())
+            {
                 newSurface.material = materials[p.materialIndex.value()];
             }
             else {
@@ -391,47 +405,55 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
             newmesh->surfaces.push_back(newSurface);
         }
 
-        newmesh->meshBuffers = renderer->uploadMesh(indices, vertices);
+        newmesh->meshBuffers = renderer->upload_mesh_immidiate(indices, vertices);
     }
-    //> load_nodes
-        // load all nodes and their meshes
-    for (fastgltf::Node& node : gltf.nodes) {
+
+    // load all nodes and their meshes
+    for (fastgltf::Node& node : gltf.nodes)
+    {
         std::shared_ptr<Node> newNode;
 
         // find if the node has a mesh, and if it does hook it to the mesh pointer and allocate it with the meshnode class
-        if (node.meshIndex.has_value()) {
+        if (node.meshIndex.has_value())
+        {
             newNode = std::make_shared<MeshNode>();
             static_cast<MeshNode*>(newNode.get())->mesh = meshes[*node.meshIndex];
         }
-        else {
+        else
+        {
             newNode = std::make_shared<Node>();
         }
 
         nodes.push_back(newNode);
-        file.nodes[node.name.c_str()];
+        loaded_gltf.nodes[node.name.c_str()];
 
-        std::visit(fastgltf::visitor{ [&](fastgltf::Node::TransformMatrix matrix) {
-                                          memcpy(&newNode->localTransform, matrix.data(), sizeof(matrix));
-                                      },
-                       [&](fastgltf::Node::TRS transform) {
-                           glm::vec3 tl(transform.translation[0], transform.translation[1],
-                               transform.translation[2]);
-                           glm::quat rot(transform.rotation[3], transform.rotation[0], transform.rotation[1],
-                               transform.rotation[2]);
-                           glm::vec3 sc(transform.scale[0], transform.scale[1], transform.scale[2]);
+        std::visit(fastgltf::visitor
+        { [&](fastgltf::Node::TransformMatrix matrix)
+            {
+                memcpy(&newNode->localTransform, matrix.data(), sizeof(matrix));
+            },
+            [&](fastgltf::Node::TRS transform)
+            {
+                glm::vec3 tl(transform.translation[0], transform.translation[1],
+                    transform.translation[2]);
+                glm::quat rot(transform.rotation[3], transform.rotation[0], transform.rotation[1],
+                    transform.rotation[2]);
+                glm::vec3 sc(transform.scale[0], transform.scale[1], transform.scale[2]);
 
-                           glm::mat4 tm = glm::translate(glm::mat4(1.f), tl);
-                           glm::mat4 rm = glm::toMat4(rot);
-                           glm::mat4 sm = glm::scale(glm::mat4(1.f), sc);
+                glm::mat4 tm = glm::translate(glm::mat4(1.f), tl);
+                glm::mat4 rm = glm::toMat4(rot);
+                glm::mat4 sm = glm::scale(glm::mat4(1.f), sc);
 
-                           newNode->localTransform = tm * rm * sm;
-                       } },
-            node.transform);
+                newNode->localTransform = tm * rm * sm;
+            }
+        },
+        node.transform);
     }
     //< load_nodes
     //> load_graph
         // run loop again to setup transform hierarchy
-    for (int i = 0; i < gltf.nodes.size(); i++) {
+    for (int i = 0; i < gltf.nodes.size(); i++)
+    {
         fastgltf::Node& node = gltf.nodes[i];
         std::shared_ptr<Node>& sceneNode = nodes[i];
 
@@ -442,9 +464,11 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
     }
 
     // find the top nodes, with no parents
-    for (auto& node : nodes) {
-        if (node->parent.lock() == nullptr) {
-            file.topNodes.push_back(node);
+    for (auto& node : nodes)
+    {
+        if (node->parent.lock() == nullptr)
+        {
+            loaded_gltf.topNodes.push_back(node);
             node->refreshTransform(glm::mat4{ 1.f });
         }
     }
@@ -465,20 +489,21 @@ void LoadedGLTF::clearAll()
 {
     VkDevice dv = creator->vk_device;
 
-    for (auto& [k, v] : meshes) {
+    for (auto& [k, v] : meshes)
+    {
 
-        creator->destroy_allocated_buffer(v->meshBuffers.indexBuffer);
-        creator->destroy_allocated_buffer(v->meshBuffers.vertexBuffer);
+        creator->destroy_allocated_buffer(*v->meshBuffers.indexBuffer);
+        creator->destroy_allocated_buffer(*v->meshBuffers.vertexBuffer);
     }
 
-    for (auto& [k, v] : images) {
-    
-        if (v.image == creator->error_checkerboard_image.image) {
-            // dont destroy the default images
-            continue;
-        }
-        creator->destroy_allocated_image(v);
-    }
+    //for (auto& [k, v] : images) {
+    //
+    //    if (v.image == creator->error_checkerboard_image.image) {
+    //        // dont destroy the default images
+    //        continue;
+    //    }
+    //    creator->destroy_allocated_image(v);
+    //}
 
     for (auto& sampler : samplers)
     {
@@ -489,5 +514,5 @@ void LoadedGLTF::clearAll()
 
     descriptorPool.destroy_pools(dv);
 
-    creator->destroy_allocated_buffer(materialBuffer);
+    creator->destroy_allocated_buffer(*materialBuffer);
 }

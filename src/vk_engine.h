@@ -63,7 +63,7 @@ struct FrameData
     VkCommandPool _commandPool;
     VkCommandBuffer _mainCommandBuffer;
 
-    AllocatedBuffer gpuSceneDataBuffer;
+    AllocatedBuffer *gpuSceneDataBuffer;
 };
 
 constexpr unsigned int FRAME_NUM = 2;
@@ -90,14 +90,16 @@ struct GLTFMetallic_Roughness
 
     VkDescriptorSetLayout materialLayout;
 
-    struct MaterialConstants {
+    struct MaterialConstants
+    {
         glm::vec4 colorFactors;
         glm::vec4 metal_rough_factors;
         //padding, we need it anyway for uniform buffers
         glm::vec4 extra[14];
     };
 
-    struct MaterialResources {
+    struct MaterialResources
+    {
         AllocatedImage colorImage;
         VkSampler colorSampler;
         AllocatedImage metalRoughImage;
@@ -232,30 +234,20 @@ public:
     void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
     void draw_geometry(VkCommandBuffer cmd);
 
-    // Destroy
-    std::vector<AllocatedImage*>  allocated_images_to_destroy;
-    std::vector<AllocatedBuffer*> allocated_buffers_to_destroy;
+    // Allocations
+    std::vector<AllocatedImage*>  allocated_images;
+    std::vector<AllocatedBuffer*> allocated_buffers;
 
     void destroy_allocated_image(const AllocatedImage& img);
     void destroy_allocated_buffer(const AllocatedBuffer& buffer);
 
     //Create
-    AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-    AllocatedImage  create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-    AllocatedImage  create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-
-
-
-
-
-
-
-
-
-
+    AllocatedBuffer* create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+    bool create_image(AllocatedImage& outImage, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage* create_image_on_gpu_immidiate(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     // upload a mesh into a pair of gpu buffers. If descriptor allocator is not
     // null, it will also create a descriptor that points to the vertex buffer
-    GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+    GPUMeshBuffers upload_mesh_immidiate(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;

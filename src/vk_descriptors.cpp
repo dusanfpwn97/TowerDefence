@@ -87,7 +87,7 @@ void DescriptorAllocatorGrowable::init(VkDevice device, uint32_t maxSets, std::s
 
     VkDescriptorPool newPool = create_pool(device, maxSets, poolRatios);
 
-    setsPerPool = maxSets * 1.5; //grow it next allocation
+    setsPerPool = uint32_t(maxSets * 1.5); //grow it next allocation
 
     readyPools.push_back(newPool);
 }
@@ -162,7 +162,7 @@ VkDescriptorPool DescriptorAllocatorGrowable::get_pool(VkDevice device)
     {
         newPool = create_pool(device, setsPerPool, ratios);
 
-        setsPerPool = setsPerPool * 1.5;
+        setsPerPool = uint32_t(setsPerPool * 1.5);
         if (setsPerPool > 4092)
         {
             setsPerPool = 4092;

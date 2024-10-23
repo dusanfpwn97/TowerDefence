@@ -13,6 +13,8 @@ public:
     glm::mat4 getViewMatrix();
     glm::mat4 getRotationMatrix();
 
+    bool is_right_mouse_button_down = false;
+
     void processSDLEvent(SDL_Event& e);
 
     void update();

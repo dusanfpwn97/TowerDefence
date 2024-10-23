@@ -21,21 +21,6 @@
 #include <glm/vec4.hpp>
 
 
-struct AllocatedImage
-{
-    AllocatedImage()
-    {
-        image = VK_NULL_HANDLE;
-        imageView = VK_NULL_HANDLE;
-        allocation = VK_NULL_HANDLE;
-    }
-    VkImage image;
-    VkImageView imageView;
-    VmaAllocation allocation;
-    VkExtent3D imageExtent;
-    VkFormat imageFormat;
-};
-
 #define VK_CHECK(x)                                                     \
     do {                                                                \
         VkResult err = x;                                               \
@@ -45,7 +30,16 @@ struct AllocatedImage
         }                                                               \
     } while (0)
 
-struct AllocatedBuffer
+struct ImageAllocation
+{
+    VkImage image;
+    VkImageView image_view;
+    VmaAllocation allocation;
+    VkExtent3D image_extent;
+    VkFormat image_format;
+};
+
+struct BufferAllocation
 {
     VkBuffer buffer;
     VmaAllocation allocation;
@@ -65,16 +59,16 @@ struct Vertex
 // holds the resources needed for a mesh
 struct GPUMeshBuffers
 {
-    AllocatedBuffer* indexBuffer;
-    AllocatedBuffer* vertexBuffer;
-    VkDeviceAddress vertexBufferAddress;
+    BufferAllocation* index_buffer;
+    BufferAllocation* vertex_buffer;
+    VkDeviceAddress vertex_buffer_address;
 };
 
 // push constants for our mesh object draws
 struct GPUDrawPushConstants
 {
-    glm::mat4 worldMatrix;
-    VkDeviceAddress vertexBuffer;
+    glm::mat4 world_matrix;
+    VkDeviceAddress vertex_buffer;
 };
 
 enum class MaterialPass :uint8_t
@@ -97,7 +91,8 @@ struct MaterialInstance {
 struct DrawContext;
 
 // base class for a renderable dynamic object
-class IRenderable {
+class IRenderable
+{
 
     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
 };
@@ -126,7 +121,8 @@ public:
     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx)
     {
         // draw children
-        for (auto& c : children) {
+        for (auto& c : children)
+        {
             c->Draw(topMatrix, ctx);
         }
     }
@@ -142,7 +138,8 @@ struct MeshNode : public Node
 };
 
 
-struct GPUSceneData {
+struct GPUSceneData
+{
     glm::mat4 view;
     glm::mat4 proj;
     glm::mat4 viewproj;

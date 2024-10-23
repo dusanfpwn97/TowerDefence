@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vk_loader.h>
 
-#include "vk_engine.h"
+#include "vk_renderer.h"
 #include "vk_initializers.h"
 #include "vk_types.h"
 #include <glm/gtx/quaternion.hpp>
@@ -13,13 +13,11 @@
 #include <fastgltf/tools.hpp>
 #include <fastgltf/util.hpp>
 
-
-//> loadimg
-AllocatedImage* load_image(VulkanRenderer* engine, fastgltf::Asset& asset, fastgltf::Image& image)
+ImageAllocation* load_image(VulkanRenderer* renderer, fastgltf::Asset& asset, fastgltf::Image& image)
 {
     int width, height, nrChannels;
 
-    AllocatedImage* new_image = nullptr;
+    ImageAllocation* new_image = nullptr;
 
     std::visit(fastgltf::visitor
     {
@@ -39,7 +37,7 @@ AllocatedImage* load_image(VulkanRenderer* engine, fastgltf::Asset& asset, fastg
                 imagesize.height = height;
                 imagesize.depth = 1;
             
-                new_image = engine->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                new_image = renderer->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
             
                 stbi_image_free(data);
             }
@@ -54,7 +52,7 @@ AllocatedImage* load_image(VulkanRenderer* engine, fastgltf::Asset& asset, fastg
                 imagesize.height = height;
                 imagesize.depth = 1;
         
-                new_image = engine->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                new_image = renderer->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
         
                 stbi_image_free(data);
             }
@@ -80,7 +78,7 @@ AllocatedImage* load_image(VulkanRenderer* engine, fastgltf::Asset& asset, fastg
                 imagesize.height = height;
                 imagesize.depth = 1;
         
-                new_image = engine->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                new_image = renderer->create_image_on_gpu_immidiate(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_USAGE_SAMPLED_BIT, true);
         
                 stbi_image_free(data);
             }
@@ -155,27 +153,34 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
     std::filesystem::path path = filePath;
 
     auto type = fastgltf::determineGltfFileType(&data);
-    if (type == fastgltf::GltfType::glTF) {
+    if (type == fastgltf::GltfType::glTF)
+    {
         auto load = parser.loadGLTF(&data, path.parent_path(), gltfOptions);
-        if (load) {
+        if (load)
+        {
             gltf = std::move(load.get());
         }
-        else {
+        else
+        {
             std::cerr << "Failed to load glTF: " << fastgltf::to_underlying(load.error()) << std::endl;
             return {};
         }
     }
-    else if (type == fastgltf::GltfType::GLB) {
+    else if (type == fastgltf::GltfType::GLB)
+    {
         auto load = parser.loadBinaryGLTF(&data, path.parent_path(), gltfOptions);
-        if (load) {
+        if (load)
+        {
             gltf = std::move(load.get());
         }
-        else {
+        else
+        {
             std::cerr << "Failed to load glTF: " << fastgltf::to_underlying(load.error()) << std::endl;
             return {};
         }
     }
-    else {
+    else
+    {
         std::cerr << "Failed to determine glTF container" << std::endl;
         return {};
     }
@@ -219,7 +224,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
     for (fastgltf::Image& image : gltf.images)
     {
         //renderer->allocated_images.emplace_back(new AllocatedImage);
-        AllocatedImage* imgRef = nullptr;// = renderer->allocated_images.back();
+        ImageAllocation* imgRef = nullptr;// = renderer->allocated_images.back();
         //bool has_loaded_image
         imgRef = load_image(renderer, gltf, image);
 
@@ -240,6 +245,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, st
 
 
     }
+
 
     // create buffer to hold the material data
     loaded_gltf.materialDataBuffer = renderer->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);

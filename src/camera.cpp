@@ -5,7 +5,7 @@
 void Camera::update()
 {
     glm::mat4 cameraRotation = getRotationMatrix();
-    position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.1f, 0.f));
+    position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.07f, 0.f));
 }
 
 void Camera::processSDLEvent(SDL_Event& e)
@@ -24,8 +24,19 @@ void Camera::processSDLEvent(SDL_Event& e)
         if (e.key.keysym.sym == SDLK_d) { velocity.x = 0; }
     }
 
-    if (e.type == SDL_MOUSEMOTION) {
-        yaw += (float)e.motion.xrel / 500.f;
+    if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT)
+    {
+        is_right_mouse_button_down = true;
+    }
+    if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
+    {
+        is_right_mouse_button_down = false;
+    }
+    
+
+    if (e.type == SDL_MOUSEMOTION && is_right_mouse_button_down)
+    {
+        yaw   += (float)e.motion.xrel / 500.f;
         pitch -= (float)e.motion.yrel / 500.f;
     }
 }

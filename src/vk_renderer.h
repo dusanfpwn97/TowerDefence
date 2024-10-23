@@ -63,7 +63,7 @@ struct FrameData
     VkCommandPool _commandPool;
     VkCommandBuffer _mainCommandBuffer;
 
-    AllocatedBuffer *gpuSceneDataBuffer;
+    BufferAllocation *gpuSceneDataBuffer;
 };
 
 constexpr unsigned int FRAME_NUM = 2;
@@ -100,9 +100,9 @@ struct GLTFMetallic_Roughness
 
     struct MaterialResources
     {
-        AllocatedImage colorImage;
+        ImageAllocation colorImage;
         VkSampler colorSampler;
-        AllocatedImage metalRoughImage;
+        ImageAllocation metalRoughImage;
         VkSampler metalRoughSampler;
         VkBuffer dataBuffer;
         uint32_t dataBufferOffset;
@@ -110,7 +110,7 @@ struct GLTFMetallic_Roughness
 
     DescriptorWriter writer;
 
-    void build_pipelines(VulkanRenderer* engine);
+    void build_pipelines(VulkanRenderer* renderer);
     void clear_resources(VkDevice device);
 
     MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
@@ -124,7 +124,7 @@ public:
     void init();
     // run main loop
     void run();
-    // shuts down the engine
+    // shuts down the renderer
     void cleanup();
     
     // Singleton
@@ -193,13 +193,13 @@ public:
     // Allocations
     VmaAllocator vma_allocator;
 
-    AllocatedImage white_image;
-    AllocatedImage black_image;
-    AllocatedImage grey_image;
-    AllocatedImage error_checkerboard_image;
+    ImageAllocation white_image;
+    ImageAllocation black_image;
+    ImageAllocation grey_image;
+    ImageAllocation error_checkerboard_image;
 
-    AllocatedImage draw_image;
-    AllocatedImage depth_image;
+    ImageAllocation draw_image;
+    ImageAllocation depth_image;
 
     // Samplers
     VkSampler default_sampler_linear;
@@ -235,16 +235,16 @@ public:
     void draw_geometry(VkCommandBuffer cmd);
 
     // Allocations
-    std::vector<AllocatedImage*>  allocated_images;
-    std::vector<AllocatedBuffer*> allocated_buffers;
+    std::vector<ImageAllocation*>  allocated_images;
+    std::vector<BufferAllocation*> allocated_buffers;
 
-    void destroy_allocated_image(const AllocatedImage& img);
-    void destroy_allocated_buffer(const AllocatedBuffer& buffer);
+    void destroy_allocated_image(const ImageAllocation& img);
+    void destroy_allocated_buffer(const BufferAllocation& buffer);
 
     //Create
-    AllocatedBuffer* create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, bool is_temporal = false);
-    bool create_image(AllocatedImage& outImage, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-    AllocatedImage* create_image_on_gpu_immidiate(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    BufferAllocation* create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, bool is_temporal = false);
+    bool create_image(ImageAllocation& outImage, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    ImageAllocation* create_image_on_gpu_immidiate(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     // upload a mesh into a pair of gpu buffers. If descriptor allocator is not
     // null, it will also create a descriptor that points to the vertex buffer
     GPUMeshBuffers upload_mesh_immidiate(std::span<uint32_t> indices, std::span<Vertex> vertices);

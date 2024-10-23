@@ -44,7 +44,7 @@ struct LoadedGLTF : public IRenderable {
     //std::unordered_map<std::string, AllocatedImage> images;
     std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
 
-    std::vector<AllocatedImage*> images;
+    std::vector<ImageAllocation*> images;
     std::vector<std::string> image_names;
 
     // nodes that dont have a parent, for iterating through the file in tree order
@@ -54,7 +54,7 @@ struct LoadedGLTF : public IRenderable {
 
     DescriptorAllocatorGrowable descriptorPool;
 
-    AllocatedBuffer *materialDataBuffer;
+    BufferAllocation *materialDataBuffer;
 
     VulkanRenderer* creator;
 
@@ -67,4 +67,4 @@ private:
     void clearAll();
 };
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* engine, std::string_view filePath);
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanRenderer* renderer, std::string_view filePath);

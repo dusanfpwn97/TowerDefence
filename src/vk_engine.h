@@ -242,7 +242,7 @@ public:
     void destroy_allocated_buffer(const AllocatedBuffer& buffer);
 
     //Create
-    AllocatedBuffer* create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+    AllocatedBuffer* create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, bool is_temporal = false);
     bool create_image(AllocatedImage& outImage, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage* create_image_on_gpu_immidiate(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     // upload a mesh into a pair of gpu buffers. If descriptor allocator is not

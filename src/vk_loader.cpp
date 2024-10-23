@@ -489,12 +489,12 @@ void LoadedGLTF::clearAll()
 {
     VkDevice dv = creator->vk_device;
 
-    for (auto& [k, v] : meshes)
-    {
-
-        creator->destroy_allocated_buffer(*v->meshBuffers.indexBuffer);
-        creator->destroy_allocated_buffer(*v->meshBuffers.vertexBuffer);
-    }
+    //for (auto& [k, v] : meshes)
+    //{
+    //
+    //    creator->destroy_allocated_buffer(*v->meshBuffers.indexBuffer);
+    //    creator->destroy_allocated_buffer(*v->meshBuffers.vertexBuffer);
+    //}
 
     //for (auto& [k, v] : images) {
     //
@@ -514,5 +514,5 @@ void LoadedGLTF::clearAll()
 
     descriptorPool.destroy_pools(dv);
 
-    creator->destroy_allocated_buffer(*materialBuffer);
+    //creator->destroy_allocated_buffer(*materialBuffer);
 }

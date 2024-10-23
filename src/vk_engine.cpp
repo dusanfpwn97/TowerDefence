@@ -424,7 +424,7 @@ void VulkanRenderer::init_default_data()
     // Create a buffer so we don't crash when deleting an empty buffer on the first frame
     for (int i = 0; i < FRAME_NUM; i++)
     {
-        frames[i].gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        frames[i].gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, true);
     }
 }
 
@@ -801,7 +801,7 @@ void VulkanRenderer::draw_geometry(VkCommandBuffer cmd)
 
 
     //allocate a new uniform buffer for the scene data
-    get_current_frame_data().gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    get_current_frame_data().gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, true);
 
     //write the buffer
     GPUSceneData* sceneUniformData = (GPUSceneData*)get_current_frame_data().gpuSceneDataBuffer->allocation->GetMappedData();
@@ -933,7 +933,7 @@ void VulkanRenderer::update_scene()
 
 }
 
-AllocatedBuffer* VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+AllocatedBuffer* VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, bool is_temporal)
 {
     // allocate buffer
     VkBufferCreateInfo bufferInfo = {};
@@ -946,7 +946,12 @@ AllocatedBuffer* VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFl
     VmaAllocationCreateInfo vmaallocInfo = {};
     vmaallocInfo.usage = memoryUsage;
     vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    AllocatedBuffer* new_buffer = allocated_buffers.emplace_back(new AllocatedBuffer);
+
+    AllocatedBuffer* new_buffer = new AllocatedBuffer;
+    if (!is_temporal)
+    {
+        allocated_buffers.push_back(new_buffer);
+    }
 
     // allocate the buffer
     VK_CHECK(vmaCreateBuffer(vma_allocator, &bufferInfo, &vmaallocInfo, &new_buffer->buffer, &new_buffer->allocation, &new_buffer->info));
@@ -994,7 +999,7 @@ AllocatedImage* VulkanRenderer::create_image_on_gpu_immidiate(void* data, VkExte
     AllocatedImage *new_image = allocated_images.emplace_back(new AllocatedImage);
 
     size_t data_size = size.depth * size.width * size.height * 4;
-    AllocatedBuffer *uploadbuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocatedBuffer *uploadbuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, true);
 
     memcpy(uploadbuffer->info.pMappedData, data, data_size);
 
@@ -1048,7 +1053,7 @@ GPUMeshBuffers VulkanRenderer::upload_mesh_immidiate(std::span<uint32_t> indices
 
     newSurface.indexBuffer = create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-    AllocatedBuffer *staging = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    AllocatedBuffer *staging = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, true);
 
     void* data = staging->allocation->GetMappedData();
 
@@ -1314,8 +1319,14 @@ void VulkanRenderer::deleteVulkanObjects()
 
     vkDestroyCommandPool(vk_device, immidiate_command_pool, nullptr);
 
-    destroy_allocated_buffer(*rectangle.indexBuffer);
-    destroy_allocated_buffer(*rectangle.vertexBuffer);
+    //destroy_allocated_buffer(*rectangle.indexBuffer);
+    //destroy_allocated_buffer(*rectangle.vertexBuffer);
+
+    for (AllocatedBuffer* buffer : allocated_buffers)
+    {
+        destroy_allocated_buffer(*buffer);
+    }
+
 
     for (AllocatedImage* image : allocated_images)
     {

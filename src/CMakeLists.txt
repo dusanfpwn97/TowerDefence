@@ -1,25 +1,29 @@
 
 # Add source to this project's executable.
 add_executable (engine 
-  main.cpp
-  vk_types.h
-  vk_types.cpp
-  vk_initializers.cpp
-  vk_initializers.h
-  vk_images.h
-  vk_images.cpp 
-  vk_descriptors.h
-  vk_descriptors.cpp
-  vk_pipelines.h
-  vk_pipelines.cpp
-  vk_renderer.h
-  vk_renderer.cpp
-  engine.h
-  engine.cpp
-  vk_loader.h
-  vk_loader.cpp
-  camera.cpp
-  camera.h
+				main.cpp
+				vk_types.h
+				vk_types.cpp
+				vk_initializers.cpp
+				vk_initializers.h
+				vk_images.h
+				vk_images.cpp 
+				vk_descriptors.h
+				vk_descriptors.cpp
+				vk_pipelines.h
+				vk_pipelines.cpp
+				vk_renderer.h
+				vk_renderer.cpp
+				engine.h
+				engine.cpp
+				vk_loader.h
+				vk_loader.cpp
+				camera.cpp
+				camera.h
+				ui/debug_ui.cpp
+				ui/debug_ui.h
+				ui/ui.cpp
+				ui/ui.h
 )
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)

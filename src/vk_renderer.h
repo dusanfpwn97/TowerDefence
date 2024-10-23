@@ -14,12 +14,17 @@
 
 #include <vk_mem_alloc.h>
 
-#include <camera.h>
 #include <vk_descriptors.h>
 #include <vk_loader.h>
 #include <vk_pipelines.h>
+
+
+
+constexpr unsigned int FRAME_NUM = 2;
+
 struct MeshAsset;
-namespace fastgltf {
+namespace fastgltf
+{
     struct Mesh;
 }
 
@@ -65,8 +70,6 @@ struct FrameData
 
     BufferAllocation *gpuSceneDataBuffer;
 };
-
-constexpr unsigned int FRAME_NUM = 2;
 
 
 struct DrawContext
@@ -121,12 +124,13 @@ class VulkanRenderer
 {
 public:
     // initializes window and vulkan
-    void init();
+    void init(class Camera* camera);
     // run main loop
-    void run();
+    void update();
     // shuts down the renderer
     void cleanup();
     
+    void resize_swapchain();
     // Singleton
     static VulkanRenderer& Get();
 
@@ -145,7 +149,7 @@ private:
     void init_imgui();
 
     void create_swapchain(uint32_t width, uint32_t height);
-    void resize_swapchain();
+
 
 public:
     bool is_initialized = false;
@@ -213,7 +217,7 @@ public:
     ComputeEffect sky;
     ComputeEffect gradient;
     std::vector<ComputeEffect> background_effects;
-    int currentBackgroundEffect = 0;
+    int currentBackgroundEffect = 1;
 
     // Materials
     GLTFMetallic_Roughness rough_metal_material;
@@ -221,7 +225,6 @@ public:
     //Misc
     float renderScale = 1;
     bool resize_requested = false;
-    bool freeze_rendering = false;
 
     // Frames
     FrameData frames[FRAME_NUM];
@@ -238,6 +241,7 @@ public:
     std::vector<ImageAllocation*>  allocated_images;
     std::vector<BufferAllocation*> allocated_buffers;
 
+    // Destroy
     void destroy_allocated_image(const ImageAllocation& img);
     void destroy_allocated_buffer(const BufferAllocation& buffer);
 
@@ -252,10 +256,10 @@ public:
 
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 
-    RendererStats stats;
+    RendererStats renderer_stats;
 
-    Camera mainCamera;
-    void update_scene();
+    class Camera* main_camera;
+
     GPUMeshBuffers rectangle;
     DrawContext drawCommands;
     GPUSceneData sceneData;

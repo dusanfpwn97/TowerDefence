@@ -1,8 +1,12 @@
+#pragma once
 #include <vk_types.h>
 #include <SDL_events.h>
 
 class Camera {
 public:
+
+    void init();
+
     glm::vec3 velocity;
     glm::vec3 position;
     // vertical rotation

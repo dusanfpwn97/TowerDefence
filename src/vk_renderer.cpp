@@ -17,6 +17,7 @@
 #include "imgui_impl_vulkan.h"
 
 #include <glm/gtx/transform.hpp>
+#include <camera.h>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
@@ -29,7 +30,7 @@ VulkanRenderer& VulkanRenderer::Get()
     return *renderer;
 }
 
-void VulkanRenderer::init()
+void VulkanRenderer::init(Camera *camera)
 {
     // only one renderer initialization is allowed with the application.
     assert(renderer == nullptr);
@@ -48,13 +49,8 @@ void VulkanRenderer::init()
 
     // everything went fine
     is_initialized = true;
+    main_camera = camera;
 
-    mainCamera.velocity = glm::vec3(0.f);
-    //mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
-    mainCamera.position = glm::vec3(0.f, 35.f, 20.f);
-
-    mainCamera.pitch = -45;
-    mainCamera.yaw = 0;
 }
 
 void VulkanRenderer::init_sdl()
@@ -432,7 +428,7 @@ void VulkanRenderer::init_default_data()
 
 void VulkanRenderer::init_renderables()
 {
-    std::string structurePath = { "..\\..\\assets\\gltf\\castle.glb" };
+    std::string structurePath = { "..\\..\\assets\\gltf\\CastleModel.glb" };
     auto structureFile = loadGltf(this, structurePath);
 
     assert(structureFile.has_value());
@@ -445,7 +441,8 @@ void VulkanRenderer::init_imgui()
     // 1: create descriptor pool for IMGUI
     //  the size of the pool is very oversize, but it's copied from imgui demo
     //  itself.
-    VkDescriptorPoolSize pool_sizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+    VkDescriptorPoolSize pool_sizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
         { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
         { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
@@ -499,90 +496,23 @@ void VulkanRenderer::init_imgui()
 
 }
 
-void VulkanRenderer::run()
+void VulkanRenderer::update()
 {
-    SDL_Event e;
-    bool bQuit = false;
+    glm::mat4 view = main_camera->getViewMatrix();
 
-    // main loop
-    while (!bQuit) {
-        auto start = std::chrono::system_clock::now();
+    // camera projection
+    glm::mat4 projection = glm::perspective(glm::radians(45.f), (float)draw_extent.width / (float)draw_extent.height, 10000.f, 0.1f);
 
-        // Handle events on queue
-        while (SDL_PollEvent(&e) != 0) {
-            // close the window when user alt-f4s or clicks the X button
-            if (e.type == SDL_QUIT)
-                bQuit = true;
+    // invert the Y direction on projection matrix so that we are more similar to opengl and gltf axis
+    projection[1][1] *= -1;
 
-            if (e.type == SDL_WINDOWEVENT) {
-
-                if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
-                    resize_requested = true;
-                }
-                if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
-                    freeze_rendering = true;
-                }
-                if (e.window.event == SDL_WINDOWEVENT_RESTORED) {
-                    freeze_rendering = false;
-                }
-            }
-
-            mainCamera.processSDLEvent(e);
-            ImGui_ImplSDL2_ProcessEvent(&e);
-        }
-
-        if (freeze_rendering) continue;
-
-        if (resize_requested) {
-            resize_swapchain();
-        }
-
-        // imgui new frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-
-        ImGui::NewFrame();
-
-        ImGui::Begin("Stats");
-
-        ImGui::Text("frametime %f ms", stats.frametime);
-        ImGui::Text("drawtime %f ms", stats.mesh_draw_time);
-        ImGui::Text("triangles %i", stats.triangle_count);
-        ImGui::Text("draws %i", stats.drawcall_count);
-        ImGui::End();
-
-        if (ImGui::Begin("background"))
-        {
-
-            ComputeEffect& selected = background_effects[currentBackgroundEffect];
-
-            ImGui::Text("Selected effect: ", selected.name);
-
-            ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, (int)background_effects.size() - 1);
-
-            ImGui::InputFloat4("data1", (float*)&selected.push_constants_data.data1);
-            ImGui::InputFloat4("data2", (float*)&selected.push_constants_data.data2);
-            ImGui::InputFloat4("data3", (float*)&selected.push_constants_data.data3);
-            ImGui::InputFloat4("data4", (float*)&selected.push_constants_data.data4);
-
-            ImGui::End();
-        }
-
-        ImGui::Render();
-
-        // imgui commands
-        // ImGui::ShowDemoWindow();
-
-        update_scene();
+    sceneData.view = view;
+    sceneData.proj = projection;
+    sceneData.viewproj = projection * view;
 
 
-        draw();
+    loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, drawCommands);
 
-        auto end = std::chrono::system_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-        stats.frametime = elapsed.count() / 1000.f;
-    }
 }
 
 void VulkanRenderer::draw_main(VkCommandBuffer cmd)
@@ -613,7 +543,7 @@ void VulkanRenderer::draw_main(VkCommandBuffer cmd)
     auto end = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    stats.mesh_draw_time = elapsed.count() / 1000.f;
+    renderer_stats.mesh_draw_time = elapsed.count() / 1000.f;
 
     vkCmdEndRendering(cmd);
 }
@@ -783,23 +713,28 @@ void VulkanRenderer::draw_geometry(VkCommandBuffer cmd)
     std::vector<uint32_t> opaque_draws;
     opaque_draws.reserve(drawCommands.OpaqueSurfaces.size());
 
-    for (int i = 0; i < drawCommands.OpaqueSurfaces.size(); i++) {
-        if (is_visible(drawCommands.OpaqueSurfaces[i], sceneData.viewproj)) {
+    for (int i = 0; i < drawCommands.OpaqueSurfaces.size(); i++)
+    {
+        if (is_visible(drawCommands.OpaqueSurfaces[i], sceneData.viewproj))
+        {
             opaque_draws.push_back(i);
         }
     }
 
     // sort the opaque surfaces by material and mesh
-    std::sort(opaque_draws.begin(), opaque_draws.end(), [&](const auto& iA, const auto& iB) {
-        const RenderObject& A = drawCommands.OpaqueSurfaces[iA];
-        const RenderObject& B = drawCommands.OpaqueSurfaces[iB];
-        if (A.material == B.material) {
-            return A.indexBuffer < B.indexBuffer;
-        }
-        else {
-            return A.material < B.material;
-        }
-        });
+    std::sort(opaque_draws.begin(), opaque_draws.end(), [&](const auto& iA, const auto& iB)
+    {
+    const RenderObject& A = drawCommands.OpaqueSurfaces[iA];
+    const RenderObject& B = drawCommands.OpaqueSurfaces[iB];
+    if (A.material == B.material)
+    {
+        return A.indexBuffer < B.indexBuffer;
+    }
+    else
+    {
+        return A.material < B.material;
+    }
+    });
 
 
     //allocate a new uniform buffer for the scene data
@@ -864,13 +799,13 @@ void VulkanRenderer::draw_geometry(VkCommandBuffer cmd)
 
         vkCmdPushConstants(cmd, r.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
 
-        stats.drawcall_count++;
-        stats.triangle_count += r.indexCount / 3;
+        renderer_stats.drawcall_count++;
+        renderer_stats.triangle_count += r.indexCount / 3;
         vkCmdDrawIndexed(cmd, r.indexCount, 1, r.firstIndex, 0, 0);
     };
 
-    stats.drawcall_count = 0;
-    stats.triangle_count = 0;
+    renderer_stats.drawcall_count = 0;
+    renderer_stats.triangle_count = 0;
 
     for (auto& r : opaque_draws) {
         draw(drawCommands.OpaqueSurfaces[r]);
@@ -911,29 +846,6 @@ void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height)
     swapchain_image_views = vkbSwapchain.get_image_views().value();
 }
 
-void VulkanRenderer::update_scene()
-{
-    mainCamera.update();
-
-    glm::mat4 view = mainCamera.getViewMatrix();
-
-    // camera projection
-    glm::mat4 projection = glm::perspective(glm::radians(45.f), (float)draw_extent.width / (float)draw_extent.height, 10000.f, 0.1f);
-
-    // invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
-    projection[1][1] *= -1;
-
-    sceneData.view = view;
-    sceneData.proj = projection;
-    sceneData.viewproj = projection * view;
-
-
-    // for (int i = 0; i < 16; i++)         {
-    loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, drawCommands);
-    //}
-
-}
 
 BufferAllocation* VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, bool is_temporal)
 {

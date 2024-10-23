@@ -1,6 +1,20 @@
 #include <camera.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include "vk_renderer.h"
+
+
+void Camera::init()
+{
+
+    velocity = glm::vec3(0.f);
+    position = glm::vec3(30.f, -00.f, -085.f);
+    position = glm::vec3(0.f, 35.f, 20.f);
+
+    pitch = -45;
+    yaw = 0;
+}
+
 
 void Camera::update()
 {
@@ -10,27 +24,38 @@ void Camera::update()
 
 void Camera::processSDLEvent(SDL_Event& e)
 {
-    if (e.type == SDL_KEYDOWN) {
+    if (e.type == SDL_KEYDOWN)
+    {
         if (e.key.keysym.sym == SDLK_w) { velocity.z = -1; }
         if (e.key.keysym.sym == SDLK_s) { velocity.z = 1; }
         if (e.key.keysym.sym == SDLK_a) { velocity.x = -1; }
         if (e.key.keysym.sym == SDLK_d) { velocity.x = 1; }
     }
 
-    if (e.type == SDL_KEYUP) {
+    if (e.type == SDL_KEYUP)
+    {
         if (e.key.keysym.sym == SDLK_w) { velocity.z = 0; }
         if (e.key.keysym.sym == SDLK_s) { velocity.z = 0; }
         if (e.key.keysym.sym == SDLK_a) { velocity.x = 0; }
         if (e.key.keysym.sym == SDLK_d) { velocity.x = 0; }
     }
-
+    
     if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT)
     {
         is_right_mouse_button_down = true;
+        //SDL_SetWindowGrab(VulkanRenderer::Get()._window, SDL_TRUE);
+        //SDL_ShowCursor(SDL_DISABLE);
+        SDL_SetRelativeMouseMode(SDL_TRUE);
+        //SDL_CaptureMouse(SDL_TRUE);
+
     }
     if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
     {
         is_right_mouse_button_down = false;
+        SDL_SetRelativeMouseMode(SDL_FALSE);
+       // SDL_ShowCursor(SDL_ENABLE);
+       // SDL_CaptureMouse(SDL_FALSE);
+
     }
     
 
@@ -38,6 +63,7 @@ void Camera::processSDLEvent(SDL_Event& e)
     {
         yaw   += (float)e.motion.xrel / 500.f;
         pitch -= (float)e.motion.yrel / 500.f;
+
     }
 }
 
